@@ -39,4 +39,14 @@ public class ValidationError
     /// Gets or sets the timestamp when the error occurred.
     /// </summary>
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Gets or sets whether this is a strict mode violation (undeclared element).
+    /// </summary>
+    public bool IsStrictModeViolation { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the list of specific validation errors (e.g., schema validation failures).
+    /// </summary>
+    public List<string> ValidationErrors { get; set; } = new();
 }

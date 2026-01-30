@@ -29,4 +29,23 @@ public class SpecEnforcerOptions
     /// Gets or sets whether to throw exceptions on validation errors. Default is false.
     /// </summary>
     public bool ThrowOnValidationError { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets whether to enable strict mode. When enabled, reports values that exist 
+    /// in traffic but are not explicitly declared in the spec (undeclared properties, 
+    /// parameters, headers, cookies). Default is false.
+    /// </summary>
+    public bool StrictMode { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets whether to enable hard mode. When enabled, validation failures are 
+    /// converted to HTTP error responses instead of just logging. Default is false.
+    /// </summary>
+    public bool HardMode { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the HTTP status code to return when hard mode is enabled and 
+    /// validation fails. Default is 400 (Bad Request).
+    /// </summary>
+    public int HardModeStatusCode { get; set; } = 400;
 }

@@ -35,7 +35,7 @@ public class SpecEnforcerMiddleware
             throw new FileNotFoundException($"OpenAPI specification file not found at {_options.OpenApiSpecPath}");
         }
 
-        _validator = new OpenApiValidator(_options.OpenApiSpecPath, validatorLogger);
+        _validator = new OpenApiValidator(_options.OpenApiSpecPath, validatorLogger, _options.StrictMode);
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -43,7 +43,12 @@ public class SpecEnforcerMiddleware
         // Validate request
         if (_options.ValidateRequests)
         {
-            await ValidateRequestAsync(context);
+            var shouldContinue = await ValidateRequestAsync(context);
+            if (!shouldContinue)
+            {
+                // Hard mode returned an error response, don't continue pipeline
+                return;
+            }
         }
 
         // Validate response by intercepting the response stream
@@ -75,7 +80,7 @@ public class SpecEnforcerMiddleware
         }
     }
 
-    private async Task ValidateRequestAsync(HttpContext context)
+    private async Task<bool> ValidateRequestAsync(HttpContext context)
     {
         var method = context.Request.Method;
         var path = context.Request.Path.Value ?? "/";
@@ -90,24 +95,97 @@ public class SpecEnforcerMiddleware
             context.Request.Body.Position = 0;
         }
 
-        var error = _validator.ValidateRequest(method, path, contentType, body);
+        var error = _validator.ValidateRequest(method, path, contentType, body,
+            context.Request.Headers, context.Request.Query, null);
 
         if (error != null)
         {
+            // Handle hard mode - return error response instead of proceeding
+            if (_options.HardMode)
+            {
+                await WriteErrorResponse(context, error);
+                return false; // Don't continue pipeline
+            }
+
             if (_options.LogErrors)
             {
-                _logger.LogWarning(
-                    "Request validation failed for {Method} {Path}: {Message}. Details: {Details}",
-                    error.Method,
-                    error.Path,
-                    error.Message,
-                    error.Details ?? "None");
+                LogValidationError("Request", error);
             }
 
             if (_options.ThrowOnValidationError)
             {
                 throw new InvalidOperationException($"Request validation failed: {error.Message}");
             }
+        }
+
+        return true; // Continue pipeline
+    }
+
+    private async Task WriteErrorResponse(HttpContext context, ValidationError error)
+    {
+        context.Response.StatusCode = _options.HardModeStatusCode;
+        context.Response.ContentType = "application/json";
+        
+        var errorResponse = new
+        {
+            error = error.Message,
+            details = error.Details,
+            validationType = error.ValidationType,
+            method = error.Method,
+            path = error.Path,
+            statusCode = error.StatusCode,
+            validationErrors = error.ValidationErrors,
+            isStrictModeViolation = error.IsStrictModeViolation,
+            timestamp = error.Timestamp
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(errorResponse);
+        await context.Response.WriteAsync(json);
+
+        if (_options.LogErrors)
+        {
+            LogValidationError("Hard Mode", error);
+        }
+    }
+
+    private void LogValidationError(string context, ValidationError error)
+    {
+        var errorDetails = error.Details ?? "None";
+        if (error.ValidationErrors.Any())
+        {
+            errorDetails += $" | Validation Errors: {string.Join(", ", error.ValidationErrors)}";
+        }
+
+        if (error.IsStrictModeViolation)
+        {
+            _logger.LogWarning(
+                "{Context} - Strict mode violation for {Method} {Path}: {Message}. Details: {Details}",
+                context,
+                error.Method,
+                error.Path,
+                error.Message,
+                errorDetails);
+        }
+        else if (error.ValidationType == "Request")
+        {
+            _logger.LogWarning(
+                "{Context} validation failed for {Method} {Path}: {Message}. Details: {Details}",
+                context,
+                error.Method,
+                error.Path,
+                error.Message,
+                errorDetails);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "{Context} validation failed for {Method} {Path} with status {StatusCode}: {Message}. Details: {Details}",
+                context,
+                error.Method,
+                error.Path,
+                error.StatusCode,
+                error.Message,
+                errorDetails);
         }
     }
 
@@ -127,19 +205,14 @@ public class SpecEnforcerMiddleware
             responseBody.Seek(0, SeekOrigin.Begin);
         }
 
-        var error = _validator.ValidateResponse(method, path, statusCode, contentType, body);
+        var error = _validator.ValidateResponse(method, path, statusCode, contentType, body, 
+            context.Response.Headers);
 
         if (error != null)
         {
             if (_options.LogErrors)
             {
-                _logger.LogWarning(
-                    "Response validation failed for {Method} {Path} with status {StatusCode}: {Message}. Details: {Details}",
-                    error.Method,
-                    error.Path,
-                    error.StatusCode,
-                    error.Message,
-                    error.Details ?? "None");
+                LogValidationError("Response", error);
             }
 
             if (_options.ThrowOnValidationError)
