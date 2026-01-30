@@ -71,4 +71,26 @@ public class SpecEnforcerOptions
     /// Default is empty (validate all status codes).
     /// </summary>
     public List<int> AllowedStatusCodes { get; set; } = new();
+    /// <summary>
+    /// Gets or sets whether to watch the OpenAPI spec file for changes and reload automatically.
+    /// Default is false.
+    /// </summary>
+    public bool WatchSpecFile { get; set; } = false;
+    /// <summary>
+    /// Gets or sets content types to validate. If empty, all content types are validated.
+    /// Default is empty (validate all).
+    /// Example: ["application/json", "application/xml"]
+    /// </summary>
+    public List<string> AllowedContentTypes { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the maximum request body size to validate in bytes.
+    /// Bodies larger than this will skip validation. Default is 10MB.
+    /// Set to 0 for unlimited.
+    /// </summary>
+    public long MaxBodySizeForValidation { get; set; } = 10 * 1024 * 1024; // 10MB
+    /// <summary>
+    /// Gets or sets whether to include request/response bodies in validation error messages.
+    /// Useful for debugging but may expose sensitive data in logs. Default is false.
+    /// </summary>
+    public bool IncludeBodiesInErrors { get; set; } = false;
 }
