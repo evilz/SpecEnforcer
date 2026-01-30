@@ -1,0 +1,84 @@
+﻿### Test Valid User Creation
+POST http://localhost:5000/users
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "role": "user"
+}
+
+### Test Invalid User Creation (Empty Name)
+POST http://localhost:5000/users
+Content-Type: application/json
+
+{
+  "name": "",
+  "email": "john@example.com",
+  "role": "user"
+}
+
+### Test Invalid User Creation (Invalid Email)
+POST http://localhost:5000/users
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "not-an-email",
+  "role": "user"
+}
+
+### Test Invalid User Creation (Invalid Role)
+POST http://localhost:5000/users
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "role": "superuser"
+}
+
+### Test Extra Properties (Enable StrictMode to catch this)
+POST http://localhost:5000/users/test-validation
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "role": "user",
+  "extraField": "This should trigger strict mode violation"
+}
+
+### Get All Users (Not validated due to method filter)
+GET http://localhost:5000/users
+
+### Get Single User
+GET http://localhost:5000/users/1
+
+### Get User with Invalid ID (should fail path parameter validation)
+GET http://localhost:5000/users/-1
+
+### Update User (Validated)
+PUT http://localhost:5000/users/1
+Content-Type: application/json
+
+{
+  "name": "Jane Doe",
+  "email": "jane@example.com",
+  "role": "admin"
+}
+
+### Delete User
+DELETE http://localhost:5000/users/1
+
+### Health Check (Excluded from validation)
+GET http://localhost:5000/health
+
+### Admin Stats (Excluded from validation)
+GET http://localhost:5000/admin/stats
+
+### Validation Metrics
+GET http://localhost:5000/spec-enforcer/metrics
+
+### Swagger UI
+GET http://localhost:5000/swagger
