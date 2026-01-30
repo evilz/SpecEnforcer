@@ -143,20 +143,20 @@ public class OpenApiValidator
 
             // Strict mode: Check for undeclared query parameters, headers, etc.
             // In strict mode, violations are reported alongside other validation errors
+            List<string> strictModeErrors = new();
             if (_strictMode)
             {
-                var strictErrors = CheckStrictModeViolations(operation, pathItem, query, headers, body, contentType, "Request");
-                if (strictErrors.Any())
+                strictModeErrors = CheckStrictModeViolations(operation, pathItem, query, headers, body, contentType, "Request");
+                if (strictModeErrors.Any())
                 {
-                    validationErrors.AddRange(strictErrors);
+                    validationErrors.AddRange(strictModeErrors);
                 }
             }
 
             if (validationErrors.Any())
             {
-                // Check if any errors are strict mode violations
-                var isStrictMode = _strictMode && validationErrors.Any(e => 
-                    e.Contains("Undeclared") || e.Contains("undeclared"));
+                // Determine if this is purely a strict mode violation or if there are also schema violations
+                var isStrictMode = _strictMode && strictModeErrors.Any() && validationErrors.Count == strictModeErrors.Count;
 
                 return new ValidationError
                 {
@@ -165,7 +165,7 @@ public class OpenApiValidator
                     Path = path,
                     Message = isStrictMode ? "Strict mode violations detected" : "Request validation failed",
                     ValidationErrors = validationErrors,
-                    IsStrictModeViolation = isStrictMode && !validationErrors.Any(e => !e.Contains("Undeclared") && !e.Contains("undeclared"))
+                    IsStrictModeViolation = isStrictMode
                 };
             }
 
@@ -305,20 +305,20 @@ public class OpenApiValidator
             }
 
             // Strict mode: Check for undeclared response headers and body properties
+            List<string> strictModeErrors = new();
             if (_strictMode && headers != null)
             {
-                var strictErrors = CheckStrictModeResponseViolations(response, headers, body, contentType);
-                if (strictErrors.Any())
+                strictModeErrors = CheckStrictModeResponseViolations(response, headers, body, contentType);
+                if (strictModeErrors.Any())
                 {
-                    validationErrors.AddRange(strictErrors);
+                    validationErrors.AddRange(strictModeErrors);
                 }
             }
 
             if (validationErrors.Any())
             {
-                // Check if any errors are strict mode violations
-                var isStrictMode = _strictMode && validationErrors.Any(e => 
-                    e.Contains("Undeclared") || e.Contains("undeclared"));
+                // Determine if this is purely a strict mode violation or if there are also schema violations
+                var isStrictMode = _strictMode && strictModeErrors.Any() && validationErrors.Count == strictModeErrors.Count;
 
                 return new ValidationError
                 {
@@ -328,7 +328,7 @@ public class OpenApiValidator
                     StatusCode = statusCode,
                     Message = isStrictMode ? "Strict mode violations detected in response" : "Response validation failed",
                     ValidationErrors = validationErrors,
-                    IsStrictModeViolation = isStrictMode && !validationErrors.Any(e => !e.Contains("Undeclared") && !e.Contains("undeclared"))
+                    IsStrictModeViolation = isStrictMode
                 };
             }
 
@@ -463,15 +463,39 @@ public class OpenApiValidator
             switch (schema.Type?.ToLowerInvariant())
             {
                 case "integer":
-                    if (!int.TryParse(value, out _))
+                    if (!int.TryParse(value, out var intValue))
                     {
                         errors.Add($"{paramLocation} parameter '{paramName}' must be an integer, got '{value}'");
                     }
+                    else
+                    {
+                        // Validate min/max for integers
+                        if (schema.Minimum.HasValue && intValue < schema.Minimum.Value)
+                        {
+                            errors.Add($"{paramLocation} parameter '{paramName}' must be at least {schema.Minimum.Value}");
+                        }
+                        if (schema.Maximum.HasValue && intValue > schema.Maximum.Value)
+                        {
+                            errors.Add($"{paramLocation} parameter '{paramName}' must be at most {schema.Maximum.Value}");
+                        }
+                    }
                     break;
                 case "number":
-                    if (!double.TryParse(value, out _))
+                    if (!double.TryParse(value, out var numValue))
                     {
                         errors.Add($"{paramLocation} parameter '{paramName}' must be a number, got '{value}'");
+                    }
+                    else
+                    {
+                        // Validate min/max for numbers
+                        if (schema.Minimum.HasValue && (decimal)numValue < schema.Minimum.Value)
+                        {
+                            errors.Add($"{paramLocation} parameter '{paramName}' must be at least {schema.Minimum.Value}");
+                        }
+                        if (schema.Maximum.HasValue && (decimal)numValue > schema.Maximum.Value)
+                        {
+                            errors.Add($"{paramLocation} parameter '{paramName}' must be at most {schema.Maximum.Value}");
+                        }
                     }
                     break;
                 case "boolean":
@@ -816,7 +840,12 @@ public class OpenApiValidator
             var standardHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "Host", "User-Agent", "Accept", "Accept-Encoding", "Accept-Language",
-                "Connection", "Content-Length", "Content-Type", "Cache-Control"
+                "Connection", "Content-Length", "Content-Type", "Cache-Control",
+                "Referer", "Origin", "Cookie", "If-None-Match", "If-Modified-Since",
+                "If-Match", "If-Unmodified-Since", "If-Range", "Range",
+                "Accept-Charset", "Accept-Datetime", "Pragma", "TE", "Trailer",
+                "Transfer-Encoding", "Upgrade", "Via", "Warning", "DNT",
+                "X-Requested-With", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto"
             };
 
             foreach (var header in headers)
@@ -857,7 +886,15 @@ public class OpenApiValidator
         var standardHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "Date", "Server", "Content-Length", "Content-Type", "Transfer-Encoding",
-            "Connection", "Cache-Control", "Vary", "ETag", "Last-Modified"
+            "Connection", "Cache-Control", "Vary", "ETag", "Last-Modified",
+            "Access-Control-Allow-Origin", "Access-Control-Allow-Methods", 
+            "Access-Control-Allow-Headers", "Access-Control-Allow-Credentials",
+            "Access-Control-Expose-Headers", "Access-Control-Max-Age",
+            "Set-Cookie", "Location", "X-Request-ID", "X-Correlation-ID",
+            "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
+            "Strict-Transport-Security", "X-Content-Type-Options", "X-Frame-Options",
+            "X-XSS-Protection", "Content-Security-Policy", "Referrer-Policy",
+            "Expires", "Age", "Pragma", "Warning"
         };
 
         // Check for undeclared response headers

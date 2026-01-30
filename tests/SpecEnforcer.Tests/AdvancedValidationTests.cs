@@ -6,23 +6,29 @@ using Xunit;
 
 namespace SpecEnforcer.Tests;
 
-public class AdvancedValidationTests
+public class AdvancedValidationTests : IDisposable
 {
     private readonly string _testSpecPath;
     private readonly ILogger<OpenApiValidator> _logger;
+    private readonly ILoggerFactory _loggerFactory;
 
     public AdvancedValidationTests()
     {
         _testSpecPath = Path.Combine(AppContext.BaseDirectory, "TestData", "advanced-api.yaml");
         
-        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
-        _logger = loggerFactory.CreateLogger<OpenApiValidator>();
+        _loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+        _logger = _loggerFactory.CreateLogger<OpenApiValidator>();
+    }
+
+    public void Dispose()
+    {
+        _loggerFactory?.Dispose();
     }
 
     #region Parameter Validation Tests
 
     [Fact]
-    public void ValidateRequest_RequiredQueryParameter_Missing_ReturnsError()
+    public void ValidateRequest_AllParametersValid_ReturnsNull()
     {
         // Arrange
         var validator = new OpenApiValidator(_testSpecPath, _logger);
@@ -35,8 +41,8 @@ public class AdvancedValidationTests
         // Act
         var error = validator.ValidateRequest("GET", "/products", null, null, headers, query, null);
 
-        // Assert - X-Request-ID is required
-        error.Should().BeNull(); // Actually no required query params in this test
+        // Assert - With valid required header, validation should pass
+        error.Should().BeNull();
     }
 
     [Fact]

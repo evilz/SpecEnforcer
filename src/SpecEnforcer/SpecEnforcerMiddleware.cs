@@ -123,6 +123,18 @@ public class SpecEnforcerMiddleware
 
     private async Task WriteErrorResponse(HttpContext context, ValidationError error)
     {
+        // Check if response has already started
+        if (context.Response.HasStarted)
+        {
+            // Cannot modify response headers after they've been sent
+            _logger.LogError(
+                "Cannot write hard mode error response - response has already started. {ValidationType} validation failed for {Method} {Path}",
+                error.ValidationType,
+                error.Method,
+                error.Path);
+            return;
+        }
+
         context.Response.StatusCode = _options.HardModeStatusCode;
         context.Response.ContentType = "application/json";
         
