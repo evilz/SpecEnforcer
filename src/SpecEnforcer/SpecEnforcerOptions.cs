@@ -61,4 +61,10 @@ public class SpecEnforcerOptions
     /// Examples: "/health", "/metrics", "/api/internal/*"
     /// </summary>
     public List<string> ExcludedPaths { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets whether to collect performance metrics for validation operations.
+    /// Default is false.
+    /// </summary>
+    public bool EnableMetrics { get; set; } = false;
 }

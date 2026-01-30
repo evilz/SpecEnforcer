@@ -20,6 +20,7 @@ public static class SpecEnforcerExtensions
         Action<SpecEnforcerOptions> configureOptions)
     {
         services.Configure(configureOptions);
+        services.AddSingleton<ValidationMetrics>();
         return services;
     }
 

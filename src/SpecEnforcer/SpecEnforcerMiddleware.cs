@@ -14,16 +14,19 @@ public class SpecEnforcerMiddleware
     private readonly ILogger<SpecEnforcerMiddleware> _logger;
     private readonly SpecEnforcerOptions _options;
     private readonly OpenApiValidator _validator;
+    private readonly ValidationMetrics? _metrics;
 
     public SpecEnforcerMiddleware(
         RequestDelegate next,
         ILogger<SpecEnforcerMiddleware> logger,
         ILogger<OpenApiValidator> validatorLogger,
-        IOptions<SpecEnforcerOptions> options)
+        IOptions<SpecEnforcerOptions> options,
+        ValidationMetrics? metrics = null)
     {
         _next = next;
         _logger = logger;
         _options = options.Value;
+        _metrics = metrics;
 
         if (string.IsNullOrEmpty(_options.OpenApiSpecPath))
         {
@@ -90,6 +93,8 @@ public class SpecEnforcerMiddleware
 
     private async Task<bool> ValidateRequestAsync(HttpContext context)
     {
+        var stopwatch = _options.EnableMetrics ? System.Diagnostics.Stopwatch.StartNew() : null;
+
         var method = context.Request.Method;
         var path = context.Request.Path.Value ?? "/";
         var contentType = context.Request.ContentType;
@@ -105,6 +110,12 @@ public class SpecEnforcerMiddleware
 
         var error = _validator.ValidateRequest(method, path, contentType, body,
             context.Request.Headers, context.Request.Query, null);
+
+        if (_options.EnableMetrics && _metrics != null)
+        {
+            stopwatch?.Stop();
+            _metrics.RecordRequestValidation(stopwatch?.ElapsedMilliseconds ?? 0, error != null);
+        }
 
         if (error != null)
         {
@@ -245,6 +256,8 @@ public class SpecEnforcerMiddleware
 
     private async Task ValidateResponseAsync(HttpContext context, MemoryStream responseBody)
     {
+        var stopwatch = _options.EnableMetrics ? System.Diagnostics.Stopwatch.StartNew() : null;
+
         var method = context.Request.Method;
         var path = context.Request.Path.Value ?? "/";
         var statusCode = context.Response.StatusCode;
@@ -261,6 +274,12 @@ public class SpecEnforcerMiddleware
 
         var error = _validator.ValidateResponse(method, path, statusCode, contentType, body, 
             context.Response.Headers);
+
+        if (_options.EnableMetrics && _metrics != null)
+        {
+            stopwatch?.Stop();
+            _metrics.RecordResponseValidation(stopwatch?.ElapsedMilliseconds ?? 0, error != null);
+        }
 
         if (error != null)
         {
