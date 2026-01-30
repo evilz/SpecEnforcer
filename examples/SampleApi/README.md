@@ -17,10 +17,10 @@ dotnet run
 3. Test the API:
 ```bash
 # Valid request - should work fine
-curl http://localhost:5000/weatherforecast
+curl http://localhost:5020/weatherforecast
 
 # Invalid request - will log validation error
-curl http://localhost:5000/invalid-endpoint
+curl http://localhost:5020/invalid-endpoint
 ```
 
 ## What It Does

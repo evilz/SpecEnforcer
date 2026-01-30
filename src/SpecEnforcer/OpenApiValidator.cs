@@ -71,7 +71,9 @@ public class OpenApiValidator
             // Validate request body if present
             if (!string.IsNullOrEmpty(body) && operation.RequestBody != null)
             {
-                var hasMatchingContent = operation.RequestBody.Content.ContainsKey(contentType ?? "");
+                // Extract media type from content type (ignore charset and other parameters)
+                var mediaType = contentType?.Split(';')[0].Trim() ?? "";
+                var hasMatchingContent = operation.RequestBody.Content.ContainsKey(mediaType);
                 if (!hasMatchingContent)
                 {
                     return new ValidationError
@@ -79,13 +81,13 @@ public class OpenApiValidator
                         ValidationType = "Request",
                         Method = method,
                         Path = path,
-                        Message = $"Content type '{contentType}' not supported for this operation",
+                        Message = $"Content type '{mediaType}' not supported for this operation",
                         Details = $"Expected one of: {string.Join(", ", operation.RequestBody.Content.Keys)}"
                     };
                 }
 
                 // Basic JSON validation if content type is application/json
-                if (contentType?.Contains("application/json") == true)
+                if (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
                 {
                     try
                     {
@@ -191,7 +193,9 @@ public class OpenApiValidator
             // Validate content type if body is present
             if (!string.IsNullOrEmpty(body) && response.Content.Count > 0)
             {
-                var hasMatchingContent = response.Content.ContainsKey(contentType ?? "");
+                // Extract media type from content type (ignore charset and other parameters)
+                var mediaType = contentType?.Split(';')[0].Trim() ?? "";
+                var hasMatchingContent = response.Content.ContainsKey(mediaType);
                 if (!hasMatchingContent)
                 {
                     return new ValidationError
@@ -200,13 +204,13 @@ public class OpenApiValidator
                         Method = method,
                         Path = path,
                         StatusCode = statusCode,
-                        Message = $"Content type '{contentType}' not defined for status {statusCode}",
+                        Message = $"Content type '{mediaType}' not defined for status {statusCode}",
                         Details = $"Expected one of: {string.Join(", ", response.Content.Keys)}"
                     };
                 }
 
                 // Basic JSON validation if content type is application/json
-                if (contentType?.Contains("application/json") == true)
+                if (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
                 {
                     try
                     {
