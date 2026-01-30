@@ -3,10 +3,7 @@ using System.Text.Json;
 using Json.Schema;
 using Microsoft.AspNetCore.Http;
 using System.Text.RegularExpressions;
-using Microsoft.OpenApi.Models;
-using Microsoft.OpenApi.Readers;
-using Microsoft.OpenApi.Writers;
-using Microsoft.OpenApi.Any;
+using Microsoft.OpenApi;
 
 namespace SpecEnforcer;
 
@@ -512,7 +509,7 @@ public class OpenApiValidator
                     if (schema.Enum != null && schema.Enum.Count > 0)
                     {
                         var enumValues = schema.Enum
-                            .Select(e => e is Microsoft.OpenApi.Any.OpenApiString str ? str.Value : e?.ToString())
+                            .Select(e => e is OpenApiString str ? str.Value : e?.ToString())
                             .Where(v => v != null)
                             .ToList();
                         if (!enumValues.Contains(value))
@@ -687,7 +684,7 @@ public class OpenApiValidator
             if (schema.Enum != null && schema.Enum.Count > 0)
             {
                 var enumValues = schema.Enum
-                    .Select(e => e is Microsoft.OpenApi.Any.OpenApiString openApiStr ? openApiStr.Value : e?.ToString())
+                    .Select(e => e is OpenApiString openApiStr ? openApiStr.Value : e?.ToString())
                     .Where(v => v != null)
                     .ToList();
                 if (!enumValues.Contains(str))
@@ -730,8 +727,9 @@ public class OpenApiValidator
         try
         {
             // Serialize OpenAPI schema to JSON
-            var jsonWriter = new System.IO.StringWriter();
-            openApiSchema.SerializeAsV3(new Microsoft.OpenApi.Writers.OpenApiJsonWriter(jsonWriter));
+            var jsonWriter = new StringWriter();
+            var writer = new OpenApiJsonWriter(jsonWriter);
+            openApiSchema.SerializeAsV3(writer);
             var schemaJson = jsonWriter.ToString();
             
             // Parse as JSON Schema
