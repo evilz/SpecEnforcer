@@ -40,6 +40,14 @@ public class SpecEnforcerMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
+        // Check if path should be excluded from validation
+        var path = context.Request.Path.Value ?? "/";
+        if (IsPathExcluded(path))
+        {
+            await _next(context);
+            return;
+        }
+
         // Validate request
         if (_options.ValidateRequests)
         {
@@ -208,6 +216,31 @@ public class SpecEnforcerMiddleware
                 error.Message,
                 errorDetails);
         }
+    }
+
+    private bool IsPathExcluded(string path)
+    {
+        foreach (var pattern in _options.ExcludedPaths)
+        {
+            // Support exact match
+            if (pattern == path)
+            {
+                return true;
+            }
+
+            // Support wildcard matching
+            if (pattern.Contains('*'))
+            {
+                var regex = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
+                    .Replace("\\*", ".*") + "$";
+                if (System.Text.RegularExpressions.Regex.IsMatch(path, regex))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private async Task ValidateResponseAsync(HttpContext context, MemoryStream responseBody)

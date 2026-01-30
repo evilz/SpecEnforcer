@@ -54,4 +54,11 @@ public class SpecEnforcerOptions
     /// If not set, uses the default format.
     /// </summary>
     public Func<ValidationError, object>? CustomErrorFormatter { get; set; }
+
+    /// <summary>
+    /// Gets or sets a list of path patterns to exclude from validation.
+    /// Supports exact matches and wildcards (*). Default is empty.
+    /// Examples: "/health", "/metrics", "/api/internal/*"
+    /// </summary>
+    public List<string> ExcludedPaths { get; set; } = new();
 }
