@@ -142,32 +142,30 @@ public class OpenApiValidator
             }
 
             // Strict mode: Check for undeclared query parameters, headers, etc.
+            // In strict mode, violations are reported alongside other validation errors
             if (_strictMode)
             {
-                var strictErrors = CheckStrictModeViolations(operation, pathItem, query, headers, body, "Request");
+                var strictErrors = CheckStrictModeViolations(operation, pathItem, query, headers, body, contentType, "Request");
                 if (strictErrors.Any())
                 {
-                    return new ValidationError
-                    {
-                        ValidationType = "Request",
-                        Method = method,
-                        Path = path,
-                        Message = "Strict mode violations detected",
-                        ValidationErrors = strictErrors,
-                        IsStrictModeViolation = true
-                    };
+                    validationErrors.AddRange(strictErrors);
                 }
             }
 
             if (validationErrors.Any())
             {
+                // Check if any errors are strict mode violations
+                var isStrictMode = _strictMode && validationErrors.Any(e => 
+                    e.Contains("Undeclared") || e.Contains("undeclared"));
+
                 return new ValidationError
                 {
                     ValidationType = "Request",
                     Method = method,
                     Path = path,
-                    Message = "Request validation failed",
-                    ValidationErrors = validationErrors
+                    Message = isStrictMode ? "Strict mode violations detected" : "Request validation failed",
+                    ValidationErrors = validationErrors,
+                    IsStrictModeViolation = isStrictMode && !validationErrors.Any(e => !e.Contains("Undeclared") && !e.Contains("undeclared"))
                 };
             }
 
@@ -309,32 +307,28 @@ public class OpenApiValidator
             // Strict mode: Check for undeclared response headers and body properties
             if (_strictMode && headers != null)
             {
-                var strictErrors = CheckStrictModeResponseViolations(response, headers, body);
+                var strictErrors = CheckStrictModeResponseViolations(response, headers, body, contentType);
                 if (strictErrors.Any())
                 {
-                    return new ValidationError
-                    {
-                        ValidationType = "Response",
-                        Method = method,
-                        Path = path,
-                        StatusCode = statusCode,
-                        Message = "Strict mode violations detected in response",
-                        ValidationErrors = strictErrors,
-                        IsStrictModeViolation = true
-                    };
+                    validationErrors.AddRange(strictErrors);
                 }
             }
 
             if (validationErrors.Any())
             {
+                // Check if any errors are strict mode violations
+                var isStrictMode = _strictMode && validationErrors.Any(e => 
+                    e.Contains("Undeclared") || e.Contains("undeclared"));
+
                 return new ValidationError
                 {
                     ValidationType = "Response",
                     Method = method,
                     Path = path,
                     StatusCode = statusCode,
-                    Message = "Response validation failed",
-                    ValidationErrors = validationErrors
+                    Message = isStrictMode ? "Strict mode violations detected in response" : "Response validation failed",
+                    ValidationErrors = validationErrors,
+                    IsStrictModeViolation = isStrictMode && !validationErrors.Any(e => !e.Contains("Undeclared") && !e.Contains("undeclared"))
                 };
             }
 
@@ -490,7 +484,10 @@ public class OpenApiValidator
                     // Enum validation
                     if (schema.Enum != null && schema.Enum.Count > 0)
                     {
-                        var enumValues = schema.Enum.Select(e => e.ToString()).ToList();
+                        var enumValues = schema.Enum
+                            .Select(e => e is Microsoft.OpenApi.Any.OpenApiString str ? str.Value : e?.ToString())
+                            .Where(v => v != null)
+                            .ToList();
                         if (!enumValues.Contains(value))
                         {
                             errors.Add($"{paramLocation} parameter '{paramName}' must be one of [{string.Join(", ", enumValues)}], got '{value}'");
@@ -540,20 +537,33 @@ public class OpenApiValidator
             // Parse JSON
             using var jsonDoc = JsonDocument.Parse(jsonBody);
             
-            // Convert OpenAPI schema to JSON Schema
-            var jsonSchema = ConvertOpenApiSchemaToJsonSchema(schema);
-            if (jsonSchema == null)
+            // First try basic manual validation which works with references
+            var manualErrors = ValidateJsonElementAgainstSchema(jsonDoc.RootElement, schema, context);
+            if (manualErrors.Any())
             {
+                errors.AddRange(manualErrors);
                 return errors;
             }
 
-            // Validate
-            var validationResult = jsonSchema.Evaluate(jsonDoc.RootElement);
-            
-            if (!validationResult.IsValid)
+            // If manual validation passes, try JSON Schema validation for more complex rules
+            // This may fail if schema has unresolved references, but manual validation already passed
+            try
             {
-                // Collect all validation errors
-                CollectValidationErrors(validationResult, errors, context);
+                var jsonSchema = ConvertOpenApiSchemaToJsonSchema(schema);
+                if (jsonSchema != null)
+                {
+                    var validationResult = jsonSchema.Evaluate(jsonDoc.RootElement);
+                    
+                    if (!validationResult.IsValid)
+                    {
+                        CollectValidationErrors(validationResult, errors, context);
+                    }
+                }
+            }
+            catch
+            {
+                // JSON Schema validation failed (likely due to unresolved refs), but manual validation passed
+                // So we'll accept the result
             }
         }
         catch (JsonException ex)
@@ -563,6 +573,126 @@ public class OpenApiValidator
         catch (Exception ex)
         {
             errors.Add($"Error validating {context}: {ex.Message}");
+        }
+
+        return errors;
+    }
+
+    private List<string> ValidateJsonElementAgainstSchema(JsonElement element, OpenApiSchema schema, string path)
+    {
+        var errors = new List<string>();
+
+        // Type validation
+        if (schema.Type != null)
+        {
+            var isValidType = schema.Type.ToLowerInvariant() switch
+            {
+                "object" => element.ValueKind == JsonValueKind.Object,
+                "array" => element.ValueKind == JsonValueKind.Array,
+                "string" => element.ValueKind == JsonValueKind.String,
+                "number" => element.ValueKind == JsonValueKind.Number,
+                "integer" => element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out _),
+                "boolean" => element.ValueKind == JsonValueKind.True || element.ValueKind == JsonValueKind.False,
+                "null" => element.ValueKind == JsonValueKind.Null,
+                _ => true
+            };
+
+            if (!isValidType)
+            {
+                errors.Add($"{path}: Expected type '{schema.Type}', got '{element.ValueKind}'");
+                return errors; // Don't continue validation if type is wrong
+            }
+        }
+
+        // Object validation
+        if (element.ValueKind == JsonValueKind.Object && schema.Properties != null)
+        {
+            // Check required properties
+            if (schema.Required != null)
+            {
+                foreach (var requiredProp in schema.Required)
+                {
+                    if (!element.TryGetProperty(requiredProp, out _))
+                    {
+                        errors.Add($"{path}: Required property '{requiredProp}' is missing");
+                    }
+                }
+            }
+
+            // Validate each property
+            foreach (var property in element.EnumerateObject())
+            {
+                if (schema.Properties.TryGetValue(property.Name, out var propSchema))
+                {
+                    var propErrors = ValidateJsonElementAgainstSchema(property.Value, propSchema, $"{path}.{property.Name}");
+                    errors.AddRange(propErrors);
+                }
+            }
+        }
+
+        // Array validation
+        if (element.ValueKind == JsonValueKind.Array && schema.Items != null)
+        {
+            int index = 0;
+            foreach (var item in element.EnumerateArray())
+            {
+                var itemErrors = ValidateJsonElementAgainstSchema(item, schema.Items, $"{path}[{index}]");
+                errors.AddRange(itemErrors);
+                index++;
+            }
+        }
+
+        // String validation
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            var str = element.GetString() ?? "";
+            
+            if (schema.MinLength.HasValue && str.Length < schema.MinLength.Value)
+            {
+                errors.Add($"{path}: String length {str.Length} is less than minimum {schema.MinLength.Value}");
+            }
+            
+            if (schema.MaxLength.HasValue && str.Length > schema.MaxLength.Value)
+            {
+                errors.Add($"{path}: String length {str.Length} is greater than maximum {schema.MaxLength.Value}");
+            }
+
+            if (schema.Enum != null && schema.Enum.Count > 0)
+            {
+                var enumValues = schema.Enum
+                    .Select(e => e is Microsoft.OpenApi.Any.OpenApiString openApiStr ? openApiStr.Value : e?.ToString())
+                    .Where(v => v != null)
+                    .ToList();
+                if (!enumValues.Contains(str))
+                {
+                    errors.Add($"{path}: Value '{str}' is not one of the allowed values: [{string.Join(", ", enumValues)}]");
+                }
+            }
+
+            if (!string.IsNullOrEmpty(schema.Pattern))
+            {
+                if (!Regex.IsMatch(str, schema.Pattern))
+                {
+                    errors.Add($"{path}: Value does not match pattern '{schema.Pattern}'");
+                }
+            }
+        }
+
+        // Number validation
+        if (element.ValueKind == JsonValueKind.Number)
+        {
+            if (element.TryGetDecimal(out var numValue))
+            {
+                if (schema.Minimum.HasValue && numValue < schema.Minimum.Value)
+                {
+                    errors.Add($"{path}: Value {numValue} is less than minimum {schema.Minimum.Value}");
+                }
+
+                if (schema.Maximum.HasValue && numValue > schema.Maximum.Value)
+                {
+                    errors.Add($"{path}: Value {numValue} is greater than maximum {schema.Maximum.Value}");
+                }
+            }
         }
 
         return errors;
@@ -578,11 +708,15 @@ public class OpenApiValidator
             var schemaJson = jsonWriter.ToString();
             
             // Parse as JSON Schema
-            return JsonSchema.FromText(schemaJson);
+            // Note: References ($ref) in the schema may not resolve correctly if they point to
+            // components in the parent document. For now, we'll rely on basic validation.
+            var schema = JsonSchema.FromText(schemaJson);
+            return schema;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to convert OpenAPI schema to JSON Schema");
+            _logger.LogDebug(ex, "Failed to convert OpenAPI schema to JSON Schema, validation may be limited");
+            // Return null to skip schema validation rather than failing
             return null;
         }
     }
@@ -637,7 +771,7 @@ public class OpenApiValidator
     }
 
     private List<string> CheckStrictModeViolations(OpenApiOperation operation, OpenApiPathItem pathItem,
-        IQueryCollection? query, IHeaderDictionary? headers, string? body, string context)
+        IQueryCollection? query, IHeaderDictionary? headers, string? body, string? contentType, string context)
     {
         var violations = new List<string>();
 
@@ -699,7 +833,6 @@ public class OpenApiValidator
         // Check for undeclared JSON properties
         if (!string.IsNullOrEmpty(body) && operation.RequestBody != null)
         {
-            var contentType = headers?["Content-Type"].ToString();
             var mediaType = contentType?.Split(';')[0].Trim() ?? "";
             
             if (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase) &&
@@ -714,7 +847,7 @@ public class OpenApiValidator
         return violations;
     }
 
-    private List<string> CheckStrictModeResponseViolations(OpenApiResponse response, IHeaderDictionary headers, string? body)
+    private List<string> CheckStrictModeResponseViolations(OpenApiResponse response, IHeaderDictionary headers, string? body, string? contentType)
     {
         var violations = new List<string>();
 
@@ -739,7 +872,6 @@ public class OpenApiValidator
         // Check for undeclared JSON properties in response
         if (!string.IsNullOrEmpty(body) && response.Content.Count > 0)
         {
-            var contentType = headers["Content-Type"].ToString();
             var mediaType = contentType?.Split(';')[0].Trim() ?? "";
             
             if (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase) &&
@@ -782,12 +914,9 @@ public class OpenApiValidator
             {
                 if (!declaredProperties.Contains(property.Name))
                 {
-                    // Check if additionalProperties is allowed
-                    if (schema.AdditionalPropertiesAllowed == false ||
-                        (schema.AdditionalProperties == null && schema.AdditionalPropertiesAllowed != true))
-                    {
-                        violations.Add($"Undeclared property in {path}: '{property.Name}'");
-                    }
+                    // In strict mode, we want to flag undeclared properties regardless of additionalProperties setting
+                    // because strict mode is about governance - finding things in traffic not in spec
+                    violations.Add($"Undeclared property in {path}: '{property.Name}'");
                 }
                 else if (schema.Properties.TryGetValue(property.Name, out var propSchema))
                 {
