@@ -1,10 +1,45 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    
+    <!-- NuGet Package Metadata -->
+    <PackageId>SpecEnforcer</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>SpecEnforcer Contributors</Authors>
+    <Company>SpecEnforcer</Company>
+    <Product>SpecEnforcer</Product>
+    <Description>A powerful .NET middleware for validating HTTP requests and responses against OpenAPI specifications with comprehensive logging, metrics, and flexible configuration options.</Description>
+    <PackageTags>openapi;validation;middleware;aspnetcore;api;schema;testing;monitoring</PackageTags>
+    <PackageProjectUrl>https://github.com/evilz/SpecEnforcer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/evilz/SpecEnforcer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>
+      - Custom error response formatter for hard mode
+      - Path exclusion filter with wildcard support
+      - Performance metrics tracking
+      - Validation metrics HTTP endpoint
+      - Custom validation event handlers
+      - HTTP method and status code filtering
+      - Content-type filtering
+      - Body size limits and debug options
+      - OpenAPI spec file watching
+      See FEATURES_ADDED.md for full details.
+    </PackageReleaseNotes>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\FEATURES_ADDED.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

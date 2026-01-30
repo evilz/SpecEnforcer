@@ -5,4 +5,8 @@
   <Folder Name="/tests/">
     <Project Path="tests/SpecEnforcer.Tests/SpecEnforcer.Tests.csproj" />
   </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/SampleApi/SampleApi.csproj" />
+    <Project Path="examples/AdvancedSampleApi/AdvancedSampleApi.csproj" />
+  </Folder>
 </Solution>

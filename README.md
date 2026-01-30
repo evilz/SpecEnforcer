@@ -1,6 +1,32 @@
 # SpecEnforcer
 
+[![Build Status](https://github.com/evilz/SpecEnforcer/actions/workflows/build.yml/badge.svg)](https://github.com/evilz/SpecEnforcer/actions/workflows/build.yml)
+[![NuGet](https://img.shields.io/nuget/v/SpecEnforcer.svg)](https://www.nuget.org/packages/SpecEnforcer/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/SpecEnforcer.svg)](https://www.nuget.org/packages/SpecEnforcer/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A .NET middleware tool to validate HTTP requests and responses against OpenAPI contracts with comprehensive logging.
+
+## 🎉 New Features!
+
+SpecEnforcer now includes **10 powerful new features** to make validation easier and more flexible:
+
+1. **Custom Error Response Formatter** - Customize error responses in hard mode
+2. **Path Exclusion Filter** - Exclude health checks, metrics, and internal endpoints
+3. **Performance Metrics** - Track validation performance and failure rates
+4. **Validation Metrics Endpoint** - HTTP endpoint exposing validation statistics
+5. **Custom Validation Event Handlers** - React to validation errors with callbacks
+6. **HTTP Method Filtering** - Validate only specific HTTP methods
+7. **Response Status Code Filtering** - Validate only specific response codes
+8. **OpenAPI Spec File Watching** - Auto-reload specs on file changes
+9. **Content-Type Filtering** - Validate only specific content types
+10. **Body Size Limits & Debug Options** - Control validation scope and debugging
+
+👉 **[See all new features in detail](FEATURES_ADDED.md)**
+
+👉 **[Try the Advanced Sample Application](examples/AdvancedSampleApi/README.md)**
+
+👉 **[Quick Start Guide](QUICK_START.md)**
 
 ## Features
 
