@@ -6,11 +6,14 @@ A .NET middleware tool to validate HTTP requests and responses against OpenAPI c
 
 - ✅ **Request Validation**: Validates incoming HTTP requests against OpenAPI specifications
 - ✅ **Response Validation**: Validates outgoing HTTP responses against OpenAPI specifications
-- ✅ **Comprehensive Logging**: Logs validation errors with detailed information
+- ✅ **Comprehensive Parameter Validation**: Path, query, header parameters with type, enum, pattern, and range validation
+- ✅ **JSON Schema Validation**: Full JSON schema validation for request/response bodies (required fields, types, enums, formats, min/max, patterns, nested objects)
 - ✅ **Path Template Matching**: Supports parameterized paths (e.g., `/users/{id}`)
-- ✅ **JSON Validation**: Validates JSON payloads for correct syntax
-- ✅ **Content Type Validation**: Ensures content types match the specification
-- ✅ **Configurable**: Flexible options to enable/disable validation and logging
+- ✅ **Response Header Validation**: Validates response headers against declared schemas
+- ✅ **Strict Mode**: Detects undeclared elements in traffic (properties, parameters, headers) for API governance
+- ✅ **Hard Mode**: Converts validation failures into HTTP error responses for fail-fast scenarios
+- ✅ **Comprehensive Logging**: Logs validation errors with detailed information
+- ✅ **Configurable**: Flexible options to enable/disable validation modes and customize behavior
 
 ## Installation
 
@@ -35,6 +38,13 @@ builder.Services.AddSpecEnforcer(options =>
     options.ValidateResponses = true;
     options.LogErrors = true;
     options.ThrowOnValidationError = false; // Set to true to throw exceptions on validation errors
+    
+    // Optional: Enable strict mode to detect undeclared elements
+    options.StrictMode = false;
+    
+    // Optional: Enable hard mode to return error responses on validation failures
+    options.HardMode = false;
+    options.HardModeStatusCode = 400; // Customize error status code
 });
 
 var app = builder.Build();
@@ -93,6 +103,74 @@ paths:
 | `ValidateResponses` | bool | `true` | Enable/disable response validation |
 | `LogErrors` | bool | `true` | Enable/disable logging of validation errors |
 | `ThrowOnValidationError` | bool | `false` | Throw exceptions when validation fails |
+| `StrictMode` | bool | `false` | Enable strict mode to detect undeclared elements in traffic |
+| `HardMode` | bool | `false` | Convert validation failures into HTTP error responses |
+| `HardModeStatusCode` | int | `400` | HTTP status code to return when hard mode is enabled |
+
+## Validation Modes
+
+### Standard Mode (Default)
+
+Validates requests and responses against your OpenAPI specification:
+- Ensures paths and methods exist in the spec
+- Validates required parameters and request bodies
+- Validates JSON against schema definitions (types, required fields, enums, formats, min/max, patterns, etc.)
+- Validates response status codes and content types
+- Validates response headers against declared schemas
+
+### Strict Mode
+
+When enabled via `StrictMode = true`, SpecEnforcer reports elements that exist in traffic but are not declared in your OpenAPI specification:
+
+- **Undeclared JSON properties** in request/response bodies
+- **Undeclared query parameters**
+- **Undeclared request headers** (excluding standard HTTP headers and security scheme headers like Authorization, X-API-Key)
+- **Undeclared response headers** (excluding standard HTTP headers)
+
+This helps enforce API governance by ensuring all API elements are properly documented.
+
+### Hard Mode
+
+When enabled via `HardMode = true`, validation failures are converted into HTTP error responses instead of just logging:
+
+- Failed request validation returns an error response immediately (configured via `HardModeStatusCode`, default 400)
+- The response includes detailed validation error information in JSON format
+- Useful for CI/CD pipelines and fail-fast scenarios
+
+## Comprehensive Validation Features
+
+SpecEnforcer provides comprehensive OpenAPI compliance validation:
+
+### Path & Operation Matching
+- ✅ Path template matching (e.g., `/users/{id}`)
+- ✅ HTTP method validation
+- ✅ Path parameter extraction and validation
+
+### Parameter Validation
+- ✅ Required parameter presence (path, query, header)
+- ✅ Type validation (string, integer, number, boolean)
+- ✅ Enum validation
+- ✅ Pattern matching (regex)
+- ✅ Min/max length for strings
+- ✅ Min/max values for numbers
+
+### Request Body Validation
+- ✅ Required body presence
+- ✅ Content-Type matching
+- ✅ JSON schema validation:
+  - Required fields
+  - Type checking
+  - Enum values
+  - String formats, min/max length, patterns
+  - Number ranges
+  - Array items
+  - Nested object validation
+
+### Response Validation
+- ✅ Status code matching
+- ✅ Content-Type validation
+- ✅ Response header validation (required headers, schema compliance)
+- ✅ JSON schema validation for response bodies
 
 ## Validation Errors
 
@@ -103,14 +181,36 @@ When validation errors occur, they are logged with the following information:
 - **Path**: The request path
 - **Status Code**: (for response validation)
 - **Error Message**: Description of the validation error
-- **Details**: Additional context about the error
+- **Validation Errors**: List of specific validation failures
+- **Is Strict Mode Violation**: Whether this is a strict mode governance issue
 - **Timestamp**: When the error occurred
 
 ### Example Log Output
 
 ```
-[Warning] Request validation failed for POST /users: Request body is required but was not provided
-[Warning] Response validation failed for GET /users with status 500: Status code 500 not defined in OpenAPI specification for this operation. Details: Expected one of: 200
+[Warning] Request validation failed for POST /products: Request validation failed. Details: None | Validation Errors: request body.name: Required property 'price' is missing
+[Warning] Strict mode violations detected for GET /products: Strict mode violations detected. Details: None | Validation Errors: Undeclared query parameter: 'debug'
+[Warning] Hard Mode - Request validation failed for POST /products: Request validation failed. Details: None | Validation Errors: Path parameter 'productId' does not match pattern '^PRD-[0-9]{6}$'
+```
+
+### Hard Mode Error Response Example
+
+When hard mode is enabled, validation failures return JSON error responses:
+
+```json
+{
+  "error": "Request validation failed",
+  "details": null,
+  "validationType": "Request",
+  "method": "POST",
+  "path": "/products",
+  "statusCode": null,
+  "validationErrors": [
+    "request body.price: Required property 'price' is missing"
+  ],
+  "isStrictModeViolation": false,
+  "timestamp": "2026-01-30T17:50:00.000Z"
+}
 ```
 
 ## How It Works
@@ -118,16 +218,23 @@ When validation errors occur, they are logged with the following information:
 1. **Request Validation**: The middleware intercepts incoming requests and validates:
    - Path exists in the OpenAPI specification
    - HTTP method is allowed for the path
+   - Path parameters match their schema (type, format, pattern, enum)
+   - Query and header parameters are present (if required) and match their schema
    - Request body is present when required
    - Content type matches the specification
-   - JSON payload is well-formed
+   - JSON payload validates against schema (required fields, types, enums, formats, min/max constraints, etc.)
+   - In strict mode: detects undeclared parameters, headers, and JSON properties
 
 2. **Response Validation**: The middleware captures outgoing responses and validates:
    - Status code is defined in the specification
    - Content type matches the specification
-   - JSON payload is well-formed
+   - Response headers match declared headers (presence and schema)
+   - JSON payload validates against response schema
+   - In strict mode: detects undeclared response headers and JSON properties
 
 3. **Logging**: All validation errors are logged using `ILogger` with detailed information to help diagnose issues.
+
+4. **Hard Mode**: When enabled, validation failures immediately return error responses instead of continuing request processing.
 
 ## Building from Source
 
