@@ -145,7 +145,7 @@ app.MapGet("/users/{id:int}", (int id) =>
     return Results.Ok(user);
 });
 
-app.MapPost("/users", async ([FromBody] UserCreateRequest request) =>
+app.MapPost("/users", ([FromBody] UserCreateRequest request) =>
 {
     // Validation will happen automatically via SpecEnforcer
     var newUser = new
@@ -160,7 +160,7 @@ app.MapPost("/users", async ([FromBody] UserCreateRequest request) =>
     return Results.Created($"/users/{newUser.id}", newUser);
 });
 
-app.MapPut("/users/{id:int}", async (int id, [FromBody] UserUpdateRequest request) =>
+app.MapPut("/users/{id:int}", (int id, [FromBody] UserUpdateRequest request) =>
 {
     var updatedUser = new
     {
@@ -176,6 +176,8 @@ app.MapPut("/users/{id:int}", async (int id, [FromBody] UserUpdateRequest reques
 
 app.MapDelete("/users/{id:int}", (int id) =>
 {
+    // In a real app, you would delete the user with this id
+    // For demo purposes, we just return NoContent
     return Results.NoContent();
 });
 
