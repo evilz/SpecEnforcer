@@ -1,10 +1,12 @@
-using Microsoft.OpenApi.Models;
-using Microsoft.OpenApi.Readers;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Json.Schema;
 using Microsoft.AspNetCore.Http;
 using System.Text.RegularExpressions;
+using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi.Readers;
+using Microsoft.OpenApi.Writers;
+using Microsoft.OpenApi.Any;
 
 namespace SpecEnforcer;
 
@@ -26,7 +28,8 @@ public class OpenApiValidator
         {
             using var stream = File.OpenRead(openApiSpecPath);
             var reader = new OpenApiStreamReader();
-            _openApiDocument = reader.Read(stream, out var diagnostic);
+            var readResult = reader.Read(stream, out var diagnostic);
+            _openApiDocument = readResult;
 
             if (diagnostic.Errors.Count > 0)
             {
