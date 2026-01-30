@@ -1,0 +1,8 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=43c1e7f2_002D27e9_002D44c1_002Db3bb_002D3ba324776205/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="OpenApiValidatorTests" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;TestAncestor&gt;&#xD;
+    &lt;TestId&gt;xUnit::7EE05E79-5E7E-815C-AF79-E4111B911A72::net8.0::SpecEnforcer.Tests.OpenApiValidatorTests&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::7EE05E79-5E7E-815C-AF79-E4111B911A72::net8.0::SpecEnforcer.Tests.AdvancedValidationTests.ValidateRequest_AllParametersValid_ReturnsNull&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::7EE05E79-5E7E-815C-AF79-E4111B911A72::net8.0::SpecEnforcer.Tests.AdvancedValidationTests.ValidateRequest_RequiredHeaderParameter_Missing_ReturnsError&lt;/TestId&gt;&#xD;
+  &lt;/TestAncestor&gt;&#xD;
+&lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>

@@ -48,4 +48,10 @@ public class SpecEnforcerOptions
     /// validation fails. Default is 400 (Bad Request).
     /// </summary>
     public int HardModeStatusCode { get; set; } = 400;
+
+    /// <summary>
+    /// Gets or sets a custom error response formatter for hard mode.
+    /// If not set, uses the default format.
+    /// </summary>
+    public Func<ValidationError, object>? CustomErrorFormatter { get; set; }
 }

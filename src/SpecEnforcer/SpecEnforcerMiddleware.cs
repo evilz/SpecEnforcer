@@ -138,18 +138,27 @@ public class SpecEnforcerMiddleware
         context.Response.StatusCode = _options.HardModeStatusCode;
         context.Response.ContentType = "application/json";
         
-        var errorResponse = new
+        // Use custom formatter if provided, otherwise use default format
+        object errorResponse;
+        if (_options.CustomErrorFormatter != null)
         {
-            error = error.Message,
-            details = error.Details,
-            validationType = error.ValidationType,
-            method = error.Method,
-            path = error.Path,
-            statusCode = error.StatusCode,
-            validationErrors = error.ValidationErrors,
-            isStrictModeViolation = error.IsStrictModeViolation,
-            timestamp = error.Timestamp
-        };
+            errorResponse = _options.CustomErrorFormatter(error);
+        }
+        else
+        {
+            errorResponse = new
+            {
+                error = error.Message,
+                details = error.Details,
+                validationType = error.ValidationType,
+                method = error.Method,
+                path = error.Path,
+                statusCode = error.StatusCode,
+                validationErrors = error.ValidationErrors,
+                isStrictModeViolation = error.IsStrictModeViolation,
+                timestamp = error.Timestamp
+            };
+        }
 
         var json = System.Text.Json.JsonSerializer.Serialize(errorResponse);
         await context.Response.WriteAsync(json);
