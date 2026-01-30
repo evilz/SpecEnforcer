@@ -7,6 +7,7 @@ using Microsoft.OpenApi.Models;
 using Microsoft.OpenApi.Readers;
 using Microsoft.OpenApi.Writers;
 using Microsoft.OpenApi.Any;
+using System.Globalization;
 
 namespace SpecEnforcer;
 
@@ -483,7 +484,7 @@ public class OpenApiValidator
                     }
                     break;
                 case "number":
-                    if (!double.TryParse(value, out var numValue))
+                    if (!double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var numValue))
                     {
                         errors.Add($"{paramLocation} parameter '{paramName}' must be a number, got '{value}'");
                     }
