@@ -3,7 +3,10 @@ using System.Text.Json;
 using Json.Schema;
 using Microsoft.AspNetCore.Http;
 using System.Text.RegularExpressions;
-using Microsoft.OpenApi;
+using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi.Readers;
+using Microsoft.OpenApi.Writers;
+using Microsoft.OpenApi.Any;
 
 namespace SpecEnforcer;
 
@@ -25,8 +28,7 @@ public class OpenApiValidator
         {
             using var stream = File.OpenRead(openApiSpecPath);
             var reader = new OpenApiStreamReader();
-            var readResult = reader.Read(stream, out var diagnostic);
-            _openApiDocument = readResult;
+            _openApiDocument = reader.Read(stream, out var diagnostic);
 
             if (diagnostic.Errors.Count > 0)
             {
@@ -727,21 +729,17 @@ public class OpenApiValidator
         try
         {
             // Serialize OpenAPI schema to JSON
-            var jsonWriter = new StringWriter();
-            var writer = new OpenApiJsonWriter(jsonWriter);
-            openApiSchema.SerializeAsV3(writer);
+            var jsonWriter = new System.IO.StringWriter();
+            openApiSchema.SerializeAsV3(new Microsoft.OpenApi.Writers.OpenApiJsonWriter(jsonWriter));
             var schemaJson = jsonWriter.ToString();
             
             // Parse as JSON Schema
-            // Note: References ($ref) in the schema may not resolve correctly if they point to
-            // components in the parent document. For now, we'll rely on basic validation.
             var schema = JsonSchema.FromText(schemaJson);
             return schema;
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Failed to convert OpenAPI schema to JSON Schema, validation may be limited");
-            // Return null to skip schema validation rather than failing
             return null;
         }
     }
