@@ -1,0 +1,28 @@
+openapi: 3.0.0
+info:
+  title: Weather Forecast API
+  version: 1.0.0
+paths:
+  /weatherforecast:
+    get:
+      summary: Get weather forecast
+      operationId: GetWeatherForecast
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                    temperatureC:
+                      type: integer
+                    temperatureF:
+                      type: integer
+                    summary:
+                      type: string
