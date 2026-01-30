@@ -97,6 +97,13 @@ public class SpecEnforcerMiddleware
 
         var method = context.Request.Method;
         var path = context.Request.Path.Value ?? "/";
+        
+        // Check if method should be validated
+        if (_options.AllowedMethods.Count > 0 && !_options.AllowedMethods.Contains(method, StringComparer.OrdinalIgnoreCase))
+        {
+            return true; // Skip validation for this method
+        }
+        
         var contentType = context.Request.ContentType;
 
         string? body = null;
@@ -119,6 +126,9 @@ public class SpecEnforcerMiddleware
 
         if (error != null)
         {
+            // Invoke custom callback if provided
+            _options.OnValidationError?.Invoke(error);
+
             // Handle hard mode - return error response instead of proceeding
             if (_options.HardMode)
             {
@@ -261,6 +271,13 @@ public class SpecEnforcerMiddleware
         var method = context.Request.Method;
         var path = context.Request.Path.Value ?? "/";
         var statusCode = context.Response.StatusCode;
+        
+        // Check if status code should be validated
+        if (_options.AllowedStatusCodes.Count > 0 && !_options.AllowedStatusCodes.Contains(statusCode))
+        {
+            return; // Skip validation for this status code
+        }
+        
         var contentType = context.Response.ContentType;
 
         responseBody.Seek(0, SeekOrigin.Begin);
@@ -283,6 +300,9 @@ public class SpecEnforcerMiddleware
 
         if (error != null)
         {
+            // Invoke custom callback if provided
+            _options.OnValidationError?.Invoke(error);
+
             if (_options.LogErrors)
             {
                 LogValidationError("Response", error);
