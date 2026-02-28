@@ -28,9 +28,11 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+        cache: true
+        cache-dependency-path: '**/packages.lock.json'
     
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --locked-mode
     
     - name: Build
       run: dotnet build --configuration Release --no-restore
@@ -69,9 +71,11 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+        cache: true
+        cache-dependency-path: '**/packages.lock.json'
     
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --locked-mode
     
     - name: Determine version
       id: version
@@ -133,9 +137,11 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+        cache: true
+        cache-dependency-path: '**/packages.lock.json'
     
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --locked-mode
     
     - name: Build SampleApi
       run: dotnet build examples/SampleApi/SampleApi.csproj --configuration Release
