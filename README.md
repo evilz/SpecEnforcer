@@ -1,5 +1,7 @@
 # SpecEnforcer
 
+OpenAPI 3.0 and the validation-compatible OpenAPI 3.1 subset are covered by the request/response conformance suite. JSON Schema 2020-12-only keywords are not enforced yet.
+
 [![Build Status](https://github.com/evilz/SpecEnforcer/actions/workflows/build.yml/badge.svg)](https://github.com/evilz/SpecEnforcer/actions/workflows/build.yml)
 [![NuGet](https://img.shields.io/nuget/v/SpecEnforcer.svg)](https://www.nuget.org/packages/SpecEnforcer/)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/SpecEnforcer.svg)](https://www.nuget.org/packages/SpecEnforcer/)
