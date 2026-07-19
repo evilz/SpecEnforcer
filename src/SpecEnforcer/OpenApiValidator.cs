@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.Text;
 using System.Text.Json;
 using Json.Schema;
 using Microsoft.AspNetCore.Http;
@@ -27,7 +28,8 @@ public class OpenApiValidator
 
         try
         {
-            using var stream = File.OpenRead(openApiSpecPath);
+            var specification = NormalizeOpenApi31ForReader(File.ReadAllText(openApiSpecPath));
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(specification));
             var reader = new OpenApiStreamReader();
             _openApiDocument = reader.Read(stream, out var diagnostic);
 
@@ -42,6 +44,24 @@ public class OpenApiValidator
             _logger.LogError(ex, "Failed to load OpenAPI specification from {Path}", openApiSpecPath);
             throw;
         }
+    }
+
+    private static string NormalizeOpenApi31ForReader(string specification)
+    {
+        if (!Regex.IsMatch(specification, @"(?m)^openapi:\s*3\.1(?:\.\d+)?\s*$"))
+        {
+            return specification;
+        }
+
+        // The 1.x reader models the validation features used here but rejects the 3.1 marker.
+        specification = Regex.Replace(
+            specification,
+            @"(?m)^openapi:\s*3\.1(?:\.\d+)?\s*$",
+            "openapi: 3.0.3");
+        return Regex.Replace(
+            specification,
+            @"(?m)^jsonSchemaDialect:\s*\S+\s*(?:\r?\n)?",
+            string.Empty);
     }
 
     /// <summary>
