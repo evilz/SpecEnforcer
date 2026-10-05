@@ -50,6 +50,7 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
+        retention-days: 3
         name: test-results
         path: ./coverage
 
@@ -94,6 +95,7 @@ jobs:
     - name: Upload NuGet package artifact
       uses: actions/upload-artifact@v4
       with:
+        retention-days: 1
         name: nuget-package
         path: ${{ env.PACKAGE_OUTPUT_DIRECTORY }}/*.nupkg
 
