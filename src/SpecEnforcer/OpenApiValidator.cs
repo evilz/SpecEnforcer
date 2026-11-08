@@ -8,6 +8,9 @@ using Microsoft.OpenApi.Readers;
 using Microsoft.OpenApi.Writers;
 using Microsoft.OpenApi.Any;
 using System.Globalization;
+using YamlDotNet.RepresentationModel;
+using YamlDotNet.Core;
+using YamlDotNet.Core.Events;
 
 namespace SpecEnforcer;
 
@@ -27,9 +30,9 @@ public class OpenApiValidator
 
         try
         {
-            using var stream = File.OpenRead(openApiSpecPath);
-            var reader = new OpenApiStreamReader();
-            _openApiDocument = reader.Read(stream, out var diagnostic);
+            var specification = NormalizeOpenApi31ForReader(File.ReadAllText(openApiSpecPath));
+            var reader = new OpenApiStringReader();
+            _openApiDocument = reader.Read(specification, out var diagnostic);
 
             if (diagnostic.Errors.Count > 0)
             {
@@ -41,6 +44,88 @@ public class OpenApiValidator
         {
             _logger.LogError(ex, "Failed to load OpenAPI specification from {Path}", openApiSpecPath);
             throw;
+        }
+    }
+
+    private static string NormalizeOpenApi31ForReader(string specification)
+    {
+        var yaml = new YamlStream();
+        yaml.Load(new StringReader(specification));
+        if (yaml.Documents.Count != 1 || yaml.Documents[0].RootNode is not YamlMappingNode root ||
+            !root.Children.TryGetValue(new YamlScalarNode("openapi"), out var versionNode) ||
+            versionNode is not YamlScalarNode version ||
+            !Regex.IsMatch(version.Value ?? "", @"^3\.1\.\d+$"))
+        {
+            return specification;
+        }
+
+        var dialectKey = new YamlScalarNode("jsonSchemaDialect");
+        if (root.Children.TryGetValue(dialectKey, out var dialect) &&
+            (dialect is not YamlScalarNode scalar ||
+             (scalar.Value != "https://spec.openapis.org/oas/3.1/dialect/base" &&
+              scalar.Value != "https://json-schema.org/draft/2020-12/schema")))
+            throw new InvalidOperationException("Unsupported OpenAPI 3.1 JSON Schema dialect.");
+
+        var parser = new Parser(new StringReader(specification));
+        while (parser.MoveNext())
+            if (parser.Current is AnchorAlias)
+                throw new InvalidOperationException("OpenAPI 3.1 YAML aliases are not supported.");
+        CheckOpenApi31Document(root, false, 0);
+        root.Children.Remove(dialectKey);
+        version.Value = "3.0.3";
+        using var output = new StringWriter();
+        yaml.Save(output, false);
+        return output.ToString();
+    }
+
+    private static readonly HashSet<string> Supported31SchemaKeys = new(StringComparer.Ordinal)
+    {
+        "type", "properties", "required", "items", "minLength", "maxLength", "pattern",
+        "minimum", "maximum", "title", "description"
+    };
+
+    private static void CheckOpenApi31Document(YamlNode node, bool schemaMap, int depth)
+    {
+        if (depth > 128) throw new InvalidOperationException("OpenAPI 3.1 document nesting is too deep.");
+        if (node is YamlSequenceNode sequence)
+        {
+            foreach (var item in sequence.Children) CheckOpenApi31Document(item, false, depth + 1);
+        }
+        else if (node is YamlMappingNode mapping)
+        {
+            foreach (var entry in mapping.Children)
+            {
+                var key = (entry.Key as YamlScalarNode)?.Value ?? "";
+                if (key == "$ref")
+                    throw new InvalidOperationException("OpenAPI 3.1 references are not supported.");
+                if (schemaMap || key == "schema")
+                    CheckOpenApi31Schema(entry.Value, depth + 1);
+                else if (key != "example" && key != "examples" && !key.StartsWith("x-", StringComparison.Ordinal))
+                    CheckOpenApi31Document(entry.Value, key == "schemas", depth + 1);
+            }
+        }
+    }
+
+    private static void CheckOpenApi31Schema(YamlNode node, int depth)
+    {
+        if (depth > 128) throw new InvalidOperationException("OpenAPI 3.1 schema nesting is too deep.");
+        if (node is not YamlMappingNode schema)
+            throw new InvalidOperationException("OpenAPI 3.1 boolean and non-object schemas are not supported.");
+        foreach (var entry in schema.Children)
+        {
+            var key = (entry.Key as YamlScalarNode)?.Value ?? "";
+            if (!Supported31SchemaKeys.Contains(key))
+                throw new InvalidOperationException($"Unsupported OpenAPI 3.1 schema keyword: {key}.");
+            if (key == "type" && (entry.Value is not YamlScalarNode type ||
+                type.Value is not ("object" or "array" or "string" or "number" or "integer" or "boolean")))
+                throw new InvalidOperationException("Unsupported OpenAPI 3.1 schema type.");
+            if (key == "items") CheckOpenApi31Schema(entry.Value, depth + 1);
+            if (key == "properties")
+            {
+                if (entry.Value is not YamlMappingNode properties)
+                    throw new InvalidOperationException("OpenAPI 3.1 properties must be an object.");
+                foreach (var property in properties.Children) CheckOpenApi31Schema(property.Value, depth + 1);
+            }
         }
     }
 

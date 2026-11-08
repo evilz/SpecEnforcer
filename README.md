@@ -1,5 +1,7 @@
 # SpecEnforcer
 
+OpenAPI 3.0 and a restricted OpenAPI 3.1 subset are covered by the request/response conformance suite. For 3.1 documents, schema keywords are limited to `type`, `properties`, `required`, `items`, `minLength`, `maxLength`, `pattern`, `minimum`, `maximum`, `title`, and `description`. Schema types must be a single object, array, string, number, integer, or boolean type. Other schema keywords, references, YAML aliases, and custom JSON Schema dialects are rejected at load time. JSON and YAML documents are supported. This is not full OpenAPI 3.1 or JSON Schema 2020-12 support.
+
 [![Build Status](https://github.com/evilz/SpecEnforcer/actions/workflows/build.yml/badge.svg)](https://github.com/evilz/SpecEnforcer/actions/workflows/build.yml)
 [![NuGet](https://img.shields.io/nuget/v/SpecEnforcer.svg)](https://www.nuget.org/packages/SpecEnforcer/)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/SpecEnforcer.svg)](https://www.nuget.org/packages/SpecEnforcer/)
