@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using System.Text;
 using System.Text.Json;
 using Json.Schema;
 using Microsoft.AspNetCore.Http;
@@ -32,9 +31,8 @@ public class OpenApiValidator
         try
         {
             var specification = NormalizeOpenApi31ForReader(File.ReadAllText(openApiSpecPath));
-            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(specification));
-            var reader = new OpenApiStreamReader();
-            _openApiDocument = reader.Read(stream, out var diagnostic);
+            var reader = new OpenApiStringReader();
+            _openApiDocument = reader.Read(specification, out var diagnostic);
 
             if (diagnostic.Errors.Count > 0)
             {
